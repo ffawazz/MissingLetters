@@ -13,8 +13,9 @@ import pathlib
 import random
 import sys
 
-KEYBOARD = set("ابتثجحخدذرزسشصضطظعغفقكلمنهوي")
-FOLD = {"أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا", "ى": "ي", "ئ": "ي", "ؤ": "و", "ة": "ه"}
+# Look-alikes (ي ى ء ه ة ئ و ؤ) are DIFFERENT letters. Only the hamza-on-alef family folds to ا.
+KEYBOARD = set("ضصثقفغعهخحجدشسيبلاتنمكطذئءؤرىةوزظ")
+FOLD = {"أ": "ا", "إ": "ا", "آ": "ا", "ٱ": "ا"}
 
 
 def base(ch):
@@ -48,14 +49,12 @@ def validate(level):
     for c in level["clues"]:
         a = c["answer"]
         if any(base(ch) != ch for ch in a):
-            errs.append(f"answer '{a}' must use only the 28 base letters")
+            errs.append(f"answer '{a}' must contain only letters (write أ إ آ as ا)")
         answers |= set(letters(a))
     if len(set(cipher.values())) != len(cipher):
         errs.append("cipher numbers are not unique")
     if set(cipher) != verse | answers:
         errs.append(f"cipher letters mismatch; missing={sorted((verse|answers)-set(cipher))} extra={sorted(set(cipher)-(verse|answers))}")
-    if verse - answers:
-        errs.append(f"verse letters not reachable from any clue answer: {sorted(verse - answers)}")
     return errs
 
 

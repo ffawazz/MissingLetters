@@ -20,10 +20,10 @@ class MainActivity : ComponentActivity() {
                 val ui by vm.ui.collectAsState()
                 GameScreen(
                     ui = ui,
-                    onClue = vm::onClueSelected,
+                    onCell = vm::onCell,
                     onKey = vm::onKey,
-                    onBackspace = vm::onBackspace,
                     onHint = vm::onHint,
+                    onRestart = vm::onRestart,
                     onNext = vm::onNextLevel,
                 )
             }

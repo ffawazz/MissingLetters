@@ -1,29 +1,26 @@
 package com.missingverses.data
 
-/** The 28 base (isolated-form) Arabic letters used by the keyboard and by the cipher. */
+/**
+ * Arabic letters used by the keyboard and the cipher.
+ *
+ * Letters that look alike but are different letters stay DIFFERENT here:
+ * ي ى ء ه ة ئ و ؤ each have their own key and their own cipher number.
+ * The only folding is the hamza-on-alef family (أ إ آ ٱ -> ا); change [FOLDED] to alter that.
+ */
 object ArabicAlphabet {
-    /** Keyboard layout, 4 rows x 7 keys, in abjadi-hija'i order (rendered right-to-left). */
+    /** Standard Arabic keyboard layout, listed left-to-right exactly like a normal keyboard. */
     val keyboardRows: List<List<Char>> = listOf(
-        "ابتثجحخ", "دذرزسشص", "ضطظعغفق", "كلمنهوي"
+        "ضصثقفغعهخحجد",
+        "شسيبلاتنمكط",
+        "ذئءؤرىةوزظ",
     ).map { it.toList() }
 
-    private val keyboardSet: Set<Char> = keyboardRows.flatten().toSet()
+    val letters: Set<Char> = keyboardRows.flatten().toSet()
 
-    /**
-     * Folds any presentation/hamza/ending variant to its base letter, or returns null for
-     * anything that is not a letter (spaces, punctuation, tashkeel, tatweel).
-     *  أ إ آ ٱ -> ا   |   ى ئ -> ي   |   ؤ -> و   |   ة -> ه
-     */
-    fun baseLetter(c: Char): Char? {
-        val folded = when (c) {
-            'أ', 'إ', 'آ', 'ٱ' -> 'ا'
-            'ى', 'ئ' -> 'ي'
-            'ؤ' -> 'و'
-            'ة' -> 'ه'
-            else -> c
-        }
-        return folded.takeIf { it in keyboardSet }
-    }
+    private val FOLDED = mapOf('أ' to 'ا', 'إ' to 'ا', 'آ' to 'ا', 'ٱ' to 'ا')
+
+    /** The cipher letter for [c], or null for anything that is not a letter (space, punctuation, tashkeel, tatweel). */
+    fun baseLetter(c: Char): Char? = (FOLDED[c] ?: c).takeIf { it in letters }
 
     fun letters(text: String): List<Char> = text.mapNotNull(::baseLetter)
 }

@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -27,28 +26,32 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.missingverses.R
 import com.missingverses.data.ArabicAlphabet
 import com.missingverses.domain.GameState
+import com.missingverses.domain.MAX_MISTAKES
+
+private val WrongRed = Color(0xFFD32F2F)
 
 @Composable
 fun GameScreen(
     ui: GameUiState,
-    onClue: (Int) -> Unit,
+    onCell: (Int, List<Int>) -> Unit,
     onKey: (Char) -> Unit,
-    onBackspace: () -> Unit,
     onHint: () -> Unit,
+    onRestart: () -> Unit,
     onNext: () -> Unit,
 ) {
     val game = ui.game
@@ -58,23 +61,36 @@ fun GameScreen(
             return@Surface
         }
         Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
-            // ---- Top: title + hidden verse ----
-            HeaderSection(game, ui.levelIndex + 1)
+            // ---- Top: title, mistakes, hidden verse ----
+            HeaderSection(game, ui.levelIndex + 1, onCell)
             // ---- Middle: clues (takes all remaining height) ----
-            ClueList(game, onClue, Modifier.weight(1f))
+            ClueList(game, onCell, Modifier.weight(1f))
             // ---- Bottom: Arabic keyboard ----
-            KeyboardSection(game.mistakes, onKey, onBackspace, onHint)
+            KeyboardSection(game, onKey, onHint)
         }
-        if (game.isComplete) {
-            LevelCompleteDialog(game, ui.isLastLevel, onNext)
+        when {
+            game.isComplete -> EndDialog(
+                title = stringResource(R.string.level_complete),
+                verse = game.puzzle.level.verse,
+                poet = game.puzzle.level.poet,
+                buttonText = if (ui.isLastLevel) null else stringResource(R.string.next_level),
+                footer = if (ui.isLastLevel) stringResource(R.string.all_done) else null,
+                onClick = onNext,
+            )
+            game.isFailed -> EndDialog(
+                title = stringResource(R.string.level_failed),
+                verse = null, poet = null,
+                buttonText = stringResource(R.string.retry),
+                footer = stringResource(R.string.failed_hint),
+                onClick = onRestart,
+            )
         }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HeaderSection(game: GameState, levelNumber: Int) {
-    val activeNumbers = game.activeClue?.let { game.puzzle.clueNumbers[it].toSet() }.orEmpty()
+private fun HeaderSection(game: GameState, levelNumber: Int, onCell: (Int, List<Int>) -> Unit) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             stringResource(R.string.app_name),
@@ -82,12 +98,13 @@ private fun HeaderSection(game: GameState, levelNumber: Int) {
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.secondary,
         )
-        Text(stringResource(R.string.level_label, levelNumber), style = MaterialTheme.typography.labelLarge)
         Text(
-            "— ${game.puzzle.level.poet}" + (game.puzzle.level.poem?.let { " · $it" } ?: ""),
-            style = MaterialTheme.typography.bodySmall,
-            modifier = Modifier.alpha(0.7f),
+            stringResource(R.string.level_label, levelNumber) + "  ·  " + game.puzzle.level.poet +
+                (game.puzzle.level.poem?.let { "  ·  $it" } ?: ""),
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.alpha(0.8f),
         )
+        MistakeMarks(game.mistakes)
         // Verse can be long: keep it scrollable inside a bounded area so the keyboard never gets pushed off.
         Box(
             Modifier.fillMaxWidth().heightIn(max = 190.dp).verticalScroll(rememberScrollState()).padding(vertical = 8.dp),
@@ -99,15 +116,9 @@ private fun HeaderSection(game: GameState, levelNumber: Int) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 game.puzzle.verseWords.forEach { word ->
+                    val group = word.map { it.number }
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                        word.forEach { cell ->
-                            LetterCell(
-                                letter = game.verseLetter(cell.number),
-                                number = cell.number,
-                                highlighted = cell.number in activeNumbers && game.verseLetter(cell.number) == null,
-                                boxed = false,
-                            )
-                        }
+                        word.forEach { cell -> GameCell(game, cell.number, group, boxed = false, onCell) }
                     }
                 }
             }
@@ -115,40 +126,81 @@ private fun HeaderSection(game: GameState, levelNumber: Int) {
     }
 }
 
+/** ✕ ✕ ✕ — one mark turns red per mistake; the level fails at [MAX_MISTAKES]. */
+@Composable
+private fun MistakeMarks(mistakes: Int) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        repeat(MAX_MISTAKES) { i ->
+            Text(
+                "✕", fontSize = 22.sp, fontWeight = FontWeight.Black,
+                color = if (i < mistakes) WrongRed else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f),
+            )
+        }
+    }
+}
+
+/** Binds one cipher cell to the game state; every cell with the same number is highlighted together. */
+@Composable
+private fun GameCell(game: GameState, number: Int, group: List<Int>, boxed: Boolean, onCell: (Int, List<Int>) -> Unit) {
+    val sel = game.selection
+    LetterCell(
+        letter = game.letterAt(number),
+        number = number,
+        boxed = boxed,
+        selected = sel?.number == number,
+        related = sel != null && number in sel.group,
+        wrong = game.lastWrong?.takeIf { it.first == number }?.second,
+        onClick = { onCell(number, group) },
+    )
+}
+
 /** A single cipher cell: the letter (or a dash while hidden) above its number. */
 @Composable
-private fun LetterCell(letter: Char?, number: Int, highlighted: Boolean, boxed: Boolean) {
+private fun LetterCell(
+    letter: Char?, number: Int, boxed: Boolean, selected: Boolean, related: Boolean, wrong: Char?, onClick: () -> Unit,
+) {
     val accent = MaterialTheme.colorScheme.secondary
     val shape = RoundedCornerShape(6.dp)
+    val fill = when {
+        selected -> accent.copy(alpha = 0.55f)
+        related && letter == null -> accent.copy(alpha = 0.15f)
+        else -> Color.Transparent
+    }
     Column(
         Modifier
             .width(if (boxed) 36.dp else 28.dp)
-            .then(if (boxed) Modifier.border(BorderStroke(1.dp, if (highlighted) accent else MaterialTheme.colorScheme.outline), shape) else Modifier)
-            .background(if (highlighted) accent.copy(alpha = 0.18f) else Color.Transparent, shape)
+            .then(if (boxed) Modifier.border(BorderStroke(1.dp, if (selected) accent else MaterialTheme.colorScheme.outline), shape) else Modifier)
+            .background(fill, shape)
+            .clickable(enabled = letter == null, onClick = onClick)
             .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = letter?.toString() ?: if (boxed) " " else "–",
+            text = (letter ?: wrong)?.toString() ?: if (boxed) " " else "–",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            color = if (letter != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+            color = when {
+                letter != null -> MaterialTheme.colorScheme.primary
+                wrong != null -> WrongRed
+                else -> MaterialTheme.colorScheme.outline
+            },
         )
         Text(number.toString(), fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
     }
 }
 
 @Composable
-private fun ClueList(game: GameState, onClue: (Int) -> Unit, modifier: Modifier) {
+private fun ClueList(game: GameState, onCell: (Int, List<Int>) -> Unit, modifier: Modifier) {
     LazyColumn(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         itemsIndexed(game.puzzle.level.clues) { index, clue ->
-            val solved = index in game.solved
-            val active = index == game.activeClue
+            val numbers = game.puzzle.clueNumbers[index]
+            val solved = game.isClueSolved(index)
+            val active = game.selection?.group == numbers
             Surface(
                 shape = RoundedCornerShape(12.dp),
                 tonalElevation = if (active) 6.dp else 1.dp,
                 border = if (active) BorderStroke(2.dp, MaterialTheme.colorScheme.secondary) else null,
-                modifier = Modifier.fillMaxWidth().clickable(enabled = !solved) { onClue(index) },
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(Modifier.padding(10.dp)) {
                     Text(
@@ -156,16 +208,9 @@ private fun ClueList(game: GameState, onClue: (Int) -> Unit, modifier: Modifier)
                         style = MaterialTheme.typography.bodyLarge,
                         modifier = Modifier.alpha(if (solved) 0.55f else 1f),
                     )
-                    // Answer slots: first slot is on the right in RTL, matching the word's reading order.
+                    // Slots can be answered in ANY order: tap a slot, then a key. First slot is on the right (RTL).
                     Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        game.puzzle.clueNumbers[index].forEachIndexed { pos, number ->
-                            LetterCell(
-                                letter = game.slotLetter(index, pos),
-                                number = number,
-                                highlighted = active,
-                                boxed = true,
-                            )
-                        }
+                        numbers.forEach { number -> GameCell(game, number, numbers, boxed = true, onCell) }
                     }
                 }
             }
@@ -174,46 +219,51 @@ private fun ClueList(game: GameState, onClue: (Int) -> Unit, modifier: Modifier)
 }
 
 @Composable
-private fun KeyboardSection(mistakes: Int, onKey: (Char) -> Unit, onBackspace: () -> Unit, onHint: () -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        ArabicAlphabet.keyboardRows.forEach { row ->
-            // Row children are laid out right-to-left, so ا ب ت ... start at the right edge.
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                row.forEach { letter ->
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp)
-                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                            .clickable { onKey(letter) },
-                        contentAlignment = Alignment.Center,
-                    ) { Text(letter.toString(), fontSize = 22.sp, fontWeight = FontWeight.SemiBold) }
+private fun KeyboardSection(game: GameState, onKey: (Char) -> Unit, onHint: () -> Unit) {
+    // The keyboard is always left-to-right so it matches the physical Arabic keyboard layout.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Column(
+            Modifier.fillMaxWidth().padding(top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            val widest = ArabicAlphabet.keyboardRows.maxOf { it.size }
+            ArabicAlphabet.keyboardRows.forEach { row ->
+                Row(Modifier.fillMaxWidth(row.size / widest.toFloat()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    row.forEach { letter ->
+                        val disabled = game.isKeyDisabled(letter)
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .heightIn(min = 46.dp)
+                                .alpha(if (disabled) 0.3f else 1f)
+                                .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .clickable(enabled = !disabled) { onKey(letter) },
+                            contentAlignment = Alignment.Center,
+                        ) { Text(letter.toString(), fontSize = 22.sp, fontWeight = FontWeight.SemiBold) }
+                    }
                 }
             }
-        }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedButton(onClick = onHint, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.hint)) }
-            OutlinedButton(onClick = onBackspace, modifier = Modifier.weight(1f)) { Text(stringResource(R.string.backspace)) }
-            Text(stringResource(R.string.mistakes_label, mistakes), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+            OutlinedButton(onClick = onHint, enabled = !game.isOver) {
+                Text(stringResource(R.string.hint) + " (${game.hintsUsed})")
+            }
         }
     }
 }
 
 @Composable
-private fun LevelCompleteDialog(game: GameState, isLast: Boolean, onNext: () -> Unit) {
+private fun EndDialog(title: String, verse: String?, poet: String?, buttonText: String?, footer: String?, onClick: () -> Unit) {
     AlertDialog(
         onDismissRequest = {},
-        title = { Text(stringResource(R.string.level_complete)) },
+        title = { Text(title) },
         text = {
             Column {
-                Text(game.puzzle.level.verse, fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 36.sp)
-                Text("— ${game.puzzle.level.poet}", modifier = Modifier.padding(top = 8.dp))
-                if (isLast) Text(stringResource(R.string.all_done), modifier = Modifier.padding(top = 8.dp))
+                if (verse != null) Text(verse, fontSize = 22.sp, fontWeight = FontWeight.Bold, lineHeight = 36.sp)
+                if (poet != null) Text("— $poet", modifier = Modifier.padding(top = 8.dp))
+                if (footer != null) Text(footer, modifier = Modifier.padding(top = 8.dp))
             }
         },
-        confirmButton = {
-            if (!isLast) Button(onClick = onNext) { Text(stringResource(R.string.next_level)) }
-        },
+        confirmButton = { if (buttonText != null) Button(onClick = onClick) { Text(buttonText) } },
     )
 }

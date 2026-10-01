@@ -11,12 +11,13 @@ class Puzzle(val level: Level) {
     val numberOf: Map<Char, Int> = level.cipher.entries.associate { it.key.first() to it.value }
     val letterOf: Map<Int, Char> = numberOf.entries.associate { it.value to it.key }
 
+    /** Every number that must be revealed to finish the level (verse and clue letters). */
+    val allNumbers: Set<Int> = letterOf.keys
+
     /** Verse split into words; each word is a list of cells (punctuation/diacritics dropped). */
     val verseWords: List<List<VerseCell>> = level.verse.split(Regex("\\s+"))
         .map { word -> ArabicAlphabet.letters(word).map { VerseCell(numberOf.getValue(it), it) } }
         .filter { it.isNotEmpty() }
-
-    val verseNumbers: Set<Int> = verseWords.flatten().map { it.number }.toSet()
 
     /** For each clue, the cipher numbers of its answer letters (one per slot). */
     val clueNumbers: List<List<Int>> = level.clues.map { c ->

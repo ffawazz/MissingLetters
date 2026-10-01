@@ -42,10 +42,10 @@ class GameViewModel(app: Application) : AndroidViewModel(app) {
     private fun update(transform: (GameState) -> GameState) =
         _ui.value.game?.let { g -> _ui.value = _ui.value.copy(game = transform(g)) }
 
-    fun onClueSelected(index: Int) = update { GameEngine.selectClue(it, index) }
-    fun onKey(letter: Char) = update { GameEngine.typeLetter(it, letter) }
-    fun onBackspace() = update { GameEngine.backspace(it) }
+    fun onCell(number: Int, group: List<Int>) = update { GameEngine.select(it, number, group) }
+    fun onKey(letter: Char) = update { GameEngine.guess(it, letter) }
     fun onHint() = update { GameEngine.hint(it) }
+    fun onRestart() = update { GameEngine.restart(it) }
 
     fun onNextLevel() {
         val s = _ui.value
