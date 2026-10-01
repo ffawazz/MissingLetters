@@ -33,6 +33,11 @@ pure `GameEngine` and republishes the new state.
   Only أ إ آ fold to ا (see `ArabicAlphabet.FOLDED`). Tashkeel/punctuation are ignored.
 * The keyboard follows the standard Arabic layout, left-to-right like a physical keyboard.
 
+## Flow
+
+Main menu (play/continue, level select, exit) → levels (a level unlocks when the previous one is completed; progress is saved)
+→ game. System Back returns to the menu; the finish dialog of the last level offers the menu or exit.
+
 ## Adding levels
 
 1. Create `app/src/main/assets/levels/level_003.json` with `id`, `poet`, optional `poem`, `verse`, and `clues`

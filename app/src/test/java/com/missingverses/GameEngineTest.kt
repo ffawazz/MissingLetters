@@ -35,6 +35,10 @@ class GameEngineTest {
         levels().forEach { assertEquals("level ${it.id}", emptyList<String>(), LevelValidator.validate(it)) }
     }
 
+    @Test fun launchesWithTwentySequentialLevels() {
+        assertEquals((1..20).toList(), levels().map { it.id })
+    }
+
     @Test fun correctGuessRevealsLetterEverywhere() {
         var s = pick(GameEngine.start(first()), 'ق')
         s = GameEngine.guess(s, 'ق')

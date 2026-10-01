@@ -2,13 +2,17 @@ package com.missingverses.data
 
 import android.content.Context
 
-/** Remembers which level index the player is on. */
+/** Remembers which levels the player has completed. */
 class ProgressStore(context: Context) {
     private val prefs = context.getSharedPreferences("progress", Context.MODE_PRIVATE)
 
-    var currentLevelIndex: Int
-        get() = prefs.getInt(KEY_LEVEL, 0)
-        set(value) = prefs.edit().putInt(KEY_LEVEL, value).apply()
+    val completed: Set<Int>
+        get() = prefs.getStringSet(KEY_COMPLETED, emptySet()).orEmpty().mapNotNull { it.toIntOrNull() }.toSet()
 
-    private companion object { const val KEY_LEVEL = "level_index" }
+    fun markCompleted(levelIndex: Int) {
+        val all = prefs.getStringSet(KEY_COMPLETED, emptySet()).orEmpty() + levelIndex.toString()
+        prefs.edit().putStringSet(KEY_COMPLETED, all).apply()
+    }
+
+    private companion object { const val KEY_COMPLETED = "completed_levels" }
 }

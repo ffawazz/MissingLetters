@@ -11,4 +11,12 @@
     <string name="level_failed">انتهت المحاولات</string>
     <string name="failed_hint">أخطأت ثلاث مرات. حاول مرة أخرى!</string>
     <string name="retry">إعادة المحاولة</string>
+    <string name="tagline">أكمل أبيات الشعر العربي</string>
+    <string name="play">ابدأ اللعب</string>
+    <string name="continue_game">متابعة</string>
+    <string name="select_level">اختيار المستوى</string>
+    <string name="exit">خروج</string>
+    <string name="menu">القائمة</string>
+    <string name="main_menu">القائمة الرئيسية</string>
+    <string name="levels_title">المستويات</string>
 </resources>

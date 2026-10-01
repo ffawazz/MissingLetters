@@ -26,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -53,6 +54,8 @@ fun GameScreen(
     onHint: () -> Unit,
     onRestart: () -> Unit,
     onNext: () -> Unit,
+    onMenu: () -> Unit,
+    onExit: () -> Unit,
 ) {
     val game = ui.game
     Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
@@ -62,7 +65,7 @@ fun GameScreen(
         }
         Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
             // ---- Top: title, mistakes, hidden verse ----
-            HeaderSection(game, ui.levelIndex + 1, onCell)
+            HeaderSection(game, ui.levelIndex + 1, onCell, onMenu)
             // ---- Middle: clues (takes all remaining height) ----
             ClueList(game, onCell, Modifier.weight(1f))
             // ---- Bottom: Arabic keyboard ----
@@ -73,16 +76,18 @@ fun GameScreen(
                 title = stringResource(R.string.level_complete),
                 verse = game.puzzle.level.verse,
                 poet = game.puzzle.level.poet,
-                buttonText = if (ui.isLastLevel) null else stringResource(R.string.next_level),
                 footer = if (ui.isLastLevel) stringResource(R.string.all_done) else null,
-                onClick = onNext,
+                primaryText = if (ui.isLastLevel) stringResource(R.string.main_menu) else stringResource(R.string.next_level),
+                onPrimary = if (ui.isLastLevel) onMenu else onNext,
+                secondaryText = if (ui.isLastLevel) stringResource(R.string.exit) else stringResource(R.string.menu),
+                onSecondary = if (ui.isLastLevel) onExit else onMenu,
             )
             game.isFailed -> EndDialog(
                 title = stringResource(R.string.level_failed),
                 verse = null, poet = null,
-                buttonText = stringResource(R.string.retry),
                 footer = stringResource(R.string.failed_hint),
-                onClick = onRestart,
+                primaryText = stringResource(R.string.retry), onPrimary = onRestart,
+                secondaryText = stringResource(R.string.menu), onSecondary = onMenu,
             )
         }
     }
@@ -90,14 +95,17 @@ fun GameScreen(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun HeaderSection(game: GameState, levelNumber: Int, onCell: (Int, List<Int>) -> Unit) {
+private fun HeaderSection(game: GameState, levelNumber: Int, onCell: (Int, List<Int>) -> Unit, onMenu: () -> Unit) {
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            stringResource(R.string.app_name),
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.secondary,
-        )
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(R.string.app_name),
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+            TextButton(onClick = onMenu, modifier = Modifier.align(Alignment.CenterStart)) { Text(stringResource(R.string.menu)) }
+        }
         Text(
             stringResource(R.string.level_label, levelNumber) + "  ·  " + game.puzzle.level.poet +
                 (game.puzzle.level.poem?.let { "  ·  $it" } ?: ""),
@@ -253,7 +261,10 @@ private fun KeyboardSection(game: GameState, onKey: (Char) -> Unit, onHint: () -
 }
 
 @Composable
-private fun EndDialog(title: String, verse: String?, poet: String?, buttonText: String?, footer: String?, onClick: () -> Unit) {
+private fun EndDialog(
+    title: String, verse: String?, poet: String?, footer: String?,
+    primaryText: String, onPrimary: () -> Unit, secondaryText: String, onSecondary: () -> Unit,
+) {
     AlertDialog(
         onDismissRequest = {},
         title = { Text(title) },
@@ -264,6 +275,7 @@ private fun EndDialog(title: String, verse: String?, poet: String?, buttonText: 
                 if (footer != null) Text(footer, modifier = Modifier.padding(top = 8.dp))
             }
         },
-        confirmButton = { if (buttonText != null) Button(onClick = onClick) { Text(buttonText) } },
+        confirmButton = { Button(onClick = onPrimary) { Text(primaryText) } },
+        dismissButton = { OutlinedButton(onClick = onSecondary) { Text(secondaryText) } },
     )
 }
