@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">أبيات مفقودة</string>
+    <string name="level_label">المستوى %1$d</string>
+    <string name="clues_title">الدلائل</string>
+    <string name="hint">تلميح</string>
+    <string name="backspace">مسح</string>
+    <string name="mistakes_label">الأخطاء: %1$d</string>
+    <string name="level_complete">أحسنت! اكتمل البيت</string>
+    <string name="next_level">المستوى التالي</string>
+    <string name="all_done">أتممتَ جميع المستويات المتاحة، ترقّب المزيد قريبًا!</string>
+    <string name="load_error">تعذّر تحميل المستويات</string>
+</resources>
