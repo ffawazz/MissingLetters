@@ -38,5 +38,5 @@ pure `GameEngine` and republishes the new state.
 1. Create `app/src/main/assets/levels/level_003.json` with `id`, `poet`, optional `poem`, `verse`, and `clues`
    (`clue` text + `answer`). Omit `cipher`.
 2. `python3 tools/validate_levels.py --fill` generates the cipher and validates everything.
-   Answers must contain only letters (write أ إ آ as ا).
+   Every distinct verse letter must appear in at least one clue answer (the validator enforces it). Answers must contain only letters (write أ إ آ as ا).
 3. Rebuild. Levels are sorted by `id`. `./gradlew test` also validates all level files.

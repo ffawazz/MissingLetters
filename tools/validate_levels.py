@@ -55,6 +55,8 @@ def validate(level):
         errs.append("cipher numbers are not unique")
     if set(cipher) != verse | answers:
         errs.append(f"cipher letters mismatch; missing={sorted((verse|answers)-set(cipher))} extra={sorted(set(cipher)-(verse|answers))}")
+    if verse - answers:
+        errs.append(f"verse letters missing from ALL clue answers: {sorted(verse - answers)}")
     return errs
 
 
